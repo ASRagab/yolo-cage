@@ -11,6 +11,7 @@ as your only security control. See LICENSE for warranty disclaimers.
 import os
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -35,6 +36,29 @@ BLOCKED_DOMAINS = {
     "sprunge.us",
     "termbin.com",
 }
+
+# GitHub API policy - dangerous endpoints that agents cannot access
+# Note: This is defense-in-depth. Primary protection is the dispatcher.
+GITHUB_API_BLOCKED_PATTERNS = [
+    # Cannot merge PRs (agent proposes, human disposes)
+    ("PUT", r"/repos/[^/]+/[^/]+/pulls/\d+/merge"),
+    # Cannot delete anything
+    ("DELETE", r"/repos/.*"),
+    ("DELETE", r"/orgs/.*"),
+    ("DELETE", r"/user/.*"),
+    # Cannot read GitHub Actions secrets
+    ("GET", r"/repos/[^/]+/[^/]+/actions/secrets.*"),
+    ("GET", r"/orgs/[^/]+/actions/secrets.*"),
+    # Cannot modify repository settings
+    ("PATCH", r"/repos/[^/]+/[^/]+$"),
+    ("PUT", r"/repos/[^/]+/[^/]+/collaborators.*"),
+    # Cannot create/modify webhooks
+    ("POST", r"/repos/[^/]+/[^/]+/hooks"),
+    ("PATCH", r"/repos/[^/]+/[^/]+/hooks/\d+"),
+    # Cannot modify branch protection
+    ("PUT", r"/repos/[^/]+/[^/]+/branches/[^/]+/protection"),
+    ("DELETE", r"/repos/[^/]+/[^/]+/branches/[^/]+/protection"),
+]
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -133,9 +157,38 @@ class SecretScanner:
         else:
             logger.info(f"ALLOWED: {flow.request.method} {flow.request.pretty_url}")
 
+    def _check_github_api_policy(self, flow: http.HTTPFlow) -> Optional[str]:
+        """
+        Check if a GitHub API request is allowed.
+        Returns blocking reason if blocked, None if allowed.
+        """
+        host = flow.request.host
+        if host not in ("api.github.com", "github.com"):
+            return None
+
+        method = flow.request.method
+        path = flow.request.path
+
+        for blocked_method, pattern in GITHUB_API_BLOCKED_PATTERNS:
+            if method == blocked_method and re.match(pattern, path):
+                return f"github_api_blocked:{blocked_method} {pattern}"
+
+        return None
+
     def request(self, flow: http.HTTPFlow):
         """Intercept and scan outgoing requests."""
         host = flow.request.host
+
+        # Check GitHub API policy
+        github_block_reason = self._check_github_api_policy(flow)
+        if github_block_reason:
+            flow.response = http.Response.make(
+                403,
+                b"Blocked: this GitHub API operation is not permitted in yolo-cage",
+                {"Content-Type": "text/plain"},
+            )
+            self._log_request(flow, blocked=True, reason=github_block_reason)
+            return
 
         # Check domain blocklist
         for blocked_domain in BLOCKED_DOMAINS:
