@@ -1,5 +1,7 @@
 # yolo-cage: Safe, autonomous coding agents in Kubernetes
 
+![yolo-cage banner](yolo-cage-banner.jpg)
+
 > **Disclaimer**: This reduces risk but does not eliminate it. Do not use with production secrets or credentials where exfiltration would be catastrophic. See the [license](#license) section below.
 
 A Kubernetes sandbox for running [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents in YOLO mode (`--dangerously-skip-permissions`) with robust containment:
