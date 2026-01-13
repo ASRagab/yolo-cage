@@ -1,0 +1,46 @@
+# Example yolo-cage overlay
+# Copy this directory and customize for your project
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Use the base manifests
+resources:
+  - ../../base
+
+# Set your namespace
+namespace: my-project
+
+# Generate config from your values
+configMapGenerator:
+  - name: dispatcher-config
+    behavior: replace
+    literals:
+      - WORKSPACE_ROOT=/workspaces
+      - GIT_USER_NAME=Your Name
+      - GIT_USER_EMAIL=you@example.com
+      - YOLO_CAGE_VERSION=0.2.0
+      - PRE_PUSH_HOOKS=["trufflehog git file://. --since-commit HEAD~10 --fail --no-update"]
+      - COMMIT_FOOTER=Built autonomously using yolo-cage v0.2.0
+
+# Patch images if using a different registry
+images:
+  - name: localhost:32000/yolo-cage
+    newName: your-registry.example.com/yolo-cage
+    newTag: v0.2.0
+  - name: localhost:32000/git-dispatcher
+    newName: your-registry.example.com/git-dispatcher
+    newTag: v0.2.0
+  - name: localhost:32000/egress-proxy
+    newName: your-registry.example.com/egress-proxy
+    newTag: v0.2.0
+
+# Example patches for resources
+patches:
+  # Adjust resource limits
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 16Gi
+    target:
+      kind: Deployment
+      name: git-dispatcher
