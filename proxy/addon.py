@@ -155,13 +155,24 @@ class EgressProxy:
                 self._block(flow, b"Blocked: request body contains potential secrets", "secrets_detected", detected)
                 return
 
-        # Scan long URLs (secrets sometimes end up in URLs)
-        url = flow.request.pretty_url
-        if len(url) > 100:
-            has_secrets, detected = self._scan_for_secrets(url)
+        # Scan URL query parameters for secrets
+        query = flow.request.query
+        if query:
+            query_text = "&".join(f"{k}={v}" for k, v in query.items())
+            has_secrets, detected = self._scan_for_secrets(query_text)
             if has_secrets:
-                self._block(flow, b"Blocked: URL contains potential secrets", "secrets_in_url", detected)
+                self._block(flow, b"Blocked: URL query parameters contain potential secrets", "secrets_in_query", detected)
                 return
+
+        # Scan sensitive headers for secrets
+        sensitive_headers = ["authorization", "x-api-key", "api-key", "x-auth-token", "x-access-token"]
+        for header_name in sensitive_headers:
+            header_value = flow.request.headers.get(header_name, "")
+            if header_value:
+                has_secrets, detected = self._scan_for_secrets(header_value)
+                if has_secrets:
+                    self._block(flow, b"Blocked: request header contains potential secrets", f"secrets_in_header:{header_name}", detected)
+                    return
 
         self._log_request(flow, blocked=False)
 
