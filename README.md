@@ -166,7 +166,7 @@ yolo-cage logs <branch> [-n namespace]     # Tail pod logs
 
 - **Pre-push hooks only**: TruffleHog runs before push, not on every commit
 - **Prompt injection**: The egress filter mitigates many attacks, but sophisticated encoding could bypass scanning
-- **Fail-open by default**: If LLM-Guard is down, requests pass through (configurable)
+- **Fail-closed**: If LLM-Guard is down, requests are blocked
 
 ## Requirements
 

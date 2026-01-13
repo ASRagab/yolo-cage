@@ -25,8 +25,8 @@ WORKDIR /app
 COPY dispatcher/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy dispatcher source
-COPY dispatcher/main.py .
+# Copy dispatcher package
+COPY dispatcher/ ./dispatcher/
 
 # Create workspace mount point
 RUN mkdir -p /workspaces && chown dispatcher:dispatcher /workspaces
@@ -39,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "dispatcher.app:app", "--host", "0.0.0.0", "--port", "8080"]

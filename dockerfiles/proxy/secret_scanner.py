@@ -94,9 +94,9 @@ class SecretScanner:
         if not self.llm_guard_available:
             self._check_llm_guard()
             if not self.llm_guard_available:
-                # Fail open if LLM-Guard is down (log warning)
-                logger.warning("LLM-Guard unavailable, allowing request")
-                return False, []
+                # Fail closed if LLM-Guard is down
+                logger.error("LLM-Guard unavailable, blocking request")
+                return True, ["scanner_unavailable"]
 
         try:
             resp = requests.post(
