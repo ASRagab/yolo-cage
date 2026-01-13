@@ -187,4 +187,4 @@ MIT. See [LICENSE](LICENSE) for full text.
 
 ## Credits
 
-Designed by David Bruce Borenstein, planned and implemented by Claude. The human came up with the key ideas; the agent figured out how to build them.
+Designed by David Bruce Borenstein; planned and implemented by Claude. The human came up with the key ideas; the agent figured out how to build them.
