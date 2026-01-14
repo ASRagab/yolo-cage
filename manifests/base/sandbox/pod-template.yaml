@@ -33,6 +33,23 @@ spec:
         - name: ca-bundle
           mountPath: /ca-bundle
 
+    # Set up .claude directory with correct permissions
+    # (secret subPath mounts create parent dirs as root, breaking writes)
+    - name: setup-claude-home
+      image: python:3.12-slim-bookworm
+      command:
+        - /bin/sh
+        - -c
+        - |
+          cp /secrets/claude-oauth-credentials /claude-home/credentials.json
+          chmod 600 /claude-home/credentials.json
+      volumeMounts:
+        - name: claude-credentials
+          mountPath: /secrets
+          readOnly: true
+        - name: claude-home
+          mountPath: /claude-home
+
   containers:
     - name: yolo-cage
       image: localhost:32000/yolo-cage:latest
@@ -84,10 +101,8 @@ spec:
       volumeMounts:
         - name: workspaces
           mountPath: /workspaces
-        - name: claude-credentials
-          mountPath: /home/dev/.claude/credentials.json
-          subPath: claude-oauth-credentials
-          readOnly: true
+        - name: claude-home
+          mountPath: /home/dev/.claude
         - name: proxy-ca
           mountPath: /etc/ssl/certs/mitmproxy-ca.pem
           subPath: mitmproxy-ca.pem
@@ -111,6 +126,9 @@ spec:
           - key: claude-oauth-credentials
             path: claude-oauth-credentials
             mode: 0600
+
+    - name: claude-home
+      emptyDir: {}
 
     - name: proxy-ca
       configMap:
