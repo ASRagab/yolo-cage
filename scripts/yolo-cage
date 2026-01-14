@@ -68,20 +68,14 @@ usage() {
 yolo-cage - Sandboxed Claude Code agents with git isolation
 
 Usage:
-  yolo-cage create <branch> [-n namespace]   Create pod for branch
-  yolo-cage list [-n namespace]              List active pods
-  yolo-cage attach <branch> [-n namespace]   Exec into pod
-  yolo-cage delete <branch> [-n namespace]   Remove pod
-  yolo-cage logs <branch> [-n namespace]     Tail pod logs
+  yolo-cage [-n namespace] create <branch>   Create pod for branch
+  yolo-cage [-n namespace] list              List active pods
+  yolo-cage [-n namespace] attach <branch>   Exec into pod
+  yolo-cage [-n namespace] delete <branch>   Remove pod
+  yolo-cage [-n namespace] logs <branch>     Tail pod logs
 
 Options:
   -n, --namespace NAME    Kubernetes namespace (default: ${DEFAULT_NAMESPACE})
-
-Examples:
-  yolo-cage create feature-auth
-  yolo-cage attach feature-auth
-  yolo-cage list
-  yolo-cage delete feature-auth -n myproject
 EOF
     exit 1
 }
@@ -189,7 +183,11 @@ cmd_create() {
     echo "Pod ${pod} is ready."
     echo ""
     echo "Launch Claude with:"
-    echo "  yolo-cage attach ${branch}"
+    if [[ "$NAMESPACE" != "$DEFAULT_NAMESPACE" ]]; then
+        echo "  yolo-cage -n ${NAMESPACE} attach ${branch}"
+    else
+        echo "  yolo-cage attach ${branch}"
+    fi
 }
 
 cmd_list() {
