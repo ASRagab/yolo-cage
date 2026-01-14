@@ -9,6 +9,7 @@ This document covers all configuration options for yolo-cage. Configuration is d
 | `manifests/dispatcher/configmap.yaml` | Repository URL, git identity, pre-push hooks, commit footer |
 | `manifests/proxy/configmap.yaml` | Proxy bypass, blocked domains, GitHub API restrictions |
 | `manifests/sandbox/configmap.yaml` | Custom init scripts, SSH known hosts |
+| `manifests/sandbox/agent-prompt.yaml` | First-turn prompt, agent instructions |
 
 ---
 
@@ -61,11 +62,13 @@ Traffic to bypassed hosts is **not scanned for secrets** - this is why you shoul
 
 ```yaml
 data:
-  # Comma-separated list of hosts
-  PROXY_BYPASS: "api.anthropic.com,my-mcp-server.internal,vault.internal"
+  # Comma-separated list of hosts or domain suffixes
+  PROXY_BYPASS: ".anthropic.com,.claude.com,my-mcp-server.internal"
 ```
 
-Default: `api.anthropic.com`
+Use a leading dot (`.anthropic.com`) to match all subdomains. This is useful for services with multiple subdomains like Anthropic (api.anthropic.com, statsig.anthropic.com, etc.).
+
+Default: `.anthropic.com,.claude.com`
 
 ### Blocked Domains
 
@@ -184,6 +187,38 @@ The script:
 - Fails the pod startup if it exits non-zero
 
 Use this for project-specific setup that goes beyond what's in the base yolo-cage image.
+
+---
+
+## First-Turn Prompt
+
+When you attach to a sandbox for the first time, Claude receives an initial prompt that orients it to the environment. Customize this for your project's workflow.
+
+Edit `manifests/sandbox/agent-prompt.yaml`:
+
+```yaml
+data:
+  first-turn.txt: |
+    You are starting a new session in a yolo-cage sandbox. Please:
+
+    1. Review this project's CLAUDE.md to understand the codebase
+    2. Check your environment with `git status`
+    3. Look at open issues and pick one to work on
+
+    When ready, start implementing and commit your changes.
+```
+
+The prompt is only sent on the first attach to a new session. Subsequent attaches resume the existing conversation.
+
+### Session Management
+
+Sessions run inside tmux for persistence:
+
+- **Detach**: Press `Ctrl+B, D` to detach without ending the session
+- **Reattach**: Run `yolo-cage attach <branch>` to resume where you left off
+- **Session state**: Conversation history, tool approvals, and working state are all preserved
+
+This lets you disconnect (SSH timeout, switch tasks) and return later without losing context.
 
 ---
 
@@ -343,7 +378,7 @@ metadata:
   name: egress-policy
   namespace: yolo-cage
 data:
-  PROXY_BYPASS: "api.anthropic.com,vault.internal"
+  PROXY_BYPASS: ".anthropic.com,.claude.com,vault.internal"
   BLOCKED_DOMAINS: |
     [
       "pastebin.com",
@@ -356,15 +391,14 @@ data:
     ]
 ```
 
-**manifests/sandbox/configmap.yaml:**
+**manifests/sandbox/agent-prompt.yaml:**
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: yolo-cage-config
+  name: yolo-cage-agent-prompt
   namespace: yolo-cage
 data:
-  repo-url: "https://github.com/your-org/your-project.git"
-  git-name: "David Borenstein"
-  git-email: "david@example.com"
+  first-turn.txt: |
+    Review the project CLAUDE.md, check `git status`, and indicate you're ready to work.
 ```
