@@ -233,7 +233,7 @@ cmd_attach() {
     echo ""
     kubectl exec -it -n "${NAMESPACE}" "${pod}" -- \
         /bin/bash -c '
-            cd /workspaces/'"${branch}"'
+            cd /workspace
 
             # Read first-turn prompt if available (only used on new session)
             FIRST_TURN=""

@@ -34,30 +34,21 @@ spec:
         - name: ca-bundle
           mountPath: /ca-bundle
 
-    # Set up .claude directory with correct permissions
-    # Uses persistent storage so auth tokens survive pod restarts
+    # Set up .claude directory with credentials from secret
     - name: setup-claude-home
       image: python:3.12-slim-bookworm
       command:
         - /bin/sh
         - -c
         - |
-          # Create branch-specific .claude directory under .claude-homes/
-          mkdir -p /pvc/.claude-homes/${BRANCH}
-          # Copy credentials if not already present (preserve existing auth state)
-          if [ ! -f /pvc/.claude-homes/${BRANCH}/credentials.json ]; then
-            cp /secrets/claude-oauth-credentials /pvc/.claude-homes/${BRANCH}/credentials.json
-            chmod 600 /pvc/.claude-homes/${BRANCH}/credentials.json
-          fi
-      env:
-        - name: BRANCH
-          value: "${BRANCH}"
+          cp /secrets/claude-oauth-credentials /claude-home/credentials.json
+          chmod 600 /claude-home/credentials.json
       volumeMounts:
         - name: claude-credentials
           mountPath: /secrets
           readOnly: true
-        - name: claude-homes
-          mountPath: /pvc
+        - name: claude-home
+          mountPath: /claude-home
 
   containers:
     - name: yolo-cage
@@ -109,10 +100,10 @@ spec:
 
       volumeMounts:
         - name: workspaces
-          mountPath: /workspaces
-        - name: claude-homes
+          mountPath: /workspace
+          subPath: ${BRANCH}
+        - name: claude-home
           mountPath: /home/dev/.claude
-          subPath: .claude-homes/${BRANCH}
         - name: proxy-ca
           mountPath: /etc/ssl/certs/mitmproxy-ca.pem
           subPath: mitmproxy-ca.pem
@@ -140,12 +131,8 @@ spec:
             path: claude-oauth-credentials
             mode: 0600
 
-    # Claude home directories persist on workspaces PVC
-    # Each branch gets its own subdirectory: /.claude-homes/${BRANCH}/
-    - name: claude-homes
-      persistentVolumeClaim:
-        claimName: yolo-cage-workspaces
-      # Note: subPath handled at volumeMounts level
+    - name: claude-home
+      emptyDir: {}
 
     - name: proxy-ca
       configMap:
