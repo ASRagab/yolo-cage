@@ -2,11 +2,11 @@
 
 from fastapi.responses import PlainTextResponse
 
-from .commands import CommandCategory, classify, get_subcommand
-from .git import execute, execute_with_auth
-from .hooks import run_pre_push_hooks
-from .policy import check_branch_switch, check_merge_allowed, check_push_allowed
-from .responses import denial, command_result
+from ..commands import CommandCategory, classify, get_subcommand
+from ..git import execute, execute_with_auth
+from ..hooks import run_pre_push_hooks
+from ..policy import check_branch_switch, check_merge_allowed, check_push_allowed
+from ..responses import denial, command_result
 
 
 def handle(args: list[str], cwd: str, assigned_branch: str) -> PlainTextResponse:

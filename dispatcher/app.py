@@ -6,8 +6,8 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from . import registry
-from . import git_handler
-from . import gh_handler
+from .handlers import git as git_handler
+from .handlers import gh as gh_handler
 from .bootstrap import bootstrap_workspace, BootstrapError
 from .models import GitRequest, GhRequest
 from .paths import translate_cwd

@@ -2,9 +2,9 @@
 
 from fastapi.responses import PlainTextResponse
 
-from .gh import execute as gh_execute
-from .gh_commands import GhCommandCategory, classify_gh
-from .responses import denial, command_result
+from ..gh import execute as gh_execute
+from ..gh_commands import GhCommandCategory, classify_gh
+from ..responses import denial, command_result
 
 
 def handle(args: list[str], cwd: str) -> PlainTextResponse:
