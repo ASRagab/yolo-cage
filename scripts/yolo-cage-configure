@@ -14,7 +14,6 @@
 # Usage:
 #   yolo-cage-configure              # Apply config from ~/.yolo-cage/config.yaml
 #   yolo-cage-configure --validate   # Validate config without applying
-#   yolo-cage-configure --init       # Create example config file
 
 set -e
 
@@ -47,9 +46,9 @@ yolo-cage-configure - Configure yolo-cage with user settings
 Usage:
   yolo-cage-configure              Apply config from ~/.yolo-cage/config.yaml
   yolo-cage-configure --validate   Validate config without applying
-  yolo-cage-configure --init       Create example config file
 
 Config file: ~/.yolo-cage/config.yaml
+  Copy from config.yaml.example in the repo and edit with your credentials.
 
 Required fields:
   github_pat   GitHub Personal Access Token (fine-grained or classic)
@@ -64,50 +63,6 @@ EOF
     exit 1
 }
 
-cmd_init() {
-    if [[ -f "${CONFIG_FILE}" ]]; then
-        echo "Config file already exists: ${CONFIG_FILE}"
-        echo ""
-        echo "Edit it with your favorite editor, then run:"
-        echo "  yolo-cage-configure"
-        exit 0
-    fi
-
-    mkdir -p "${CONFIG_DIR}"
-
-    cat > "${CONFIG_FILE}" <<'EOF'
-# yolo-cage configuration
-# See: yolo-cage-configure --help
-
-# Required: GitHub Personal Access Token
-# Generate at: https://github.com/settings/tokens
-# Required permissions: repo (full control of private repositories)
-github_pat: ghp_REPLACE_WITH_YOUR_TOKEN
-
-# Required: Repository URL to work on
-repo_url: https://github.com/your-org/your-repo.git
-
-# Optional: Git author identity
-git_name: yolo-cage
-git_email: yolo-cage@localhost
-
-# Optional: Claude OAuth token (for Claude Code authentication)
-# Leave empty to use device login
-# claude_oauth: ""
-
-# Optional: Additional domains to bypass the egress proxy
-# Comma-separated list (api.anthropic.com is always included)
-# proxy_bypass: "example.com,internal.corp"
-EOF
-
-    chmod 600 "${CONFIG_FILE}"
-
-    echo "Created config file: ${CONFIG_FILE}"
-    echo ""
-    echo "Edit it with your credentials, then run:"
-    echo "  yolo-cage-configure"
-}
-
 parse_yaml() {
     # Simple YAML parser (handles basic key: value format)
     local key="$1"
@@ -120,7 +75,11 @@ validate_config() {
 
     if [[ ! -f "${CONFIG_FILE}" ]]; then
         log_error "Config file not found: ${CONFIG_FILE}"
-        echo "Run 'yolo-cage-configure --init' to create one."
+        echo ""
+        echo "Create it with:"
+        echo "  mkdir -p ~/.yolo-cage"
+        echo "  cp /home/vagrant/yolo-cage/config.yaml.example ~/.yolo-cage/config.yaml"
+        echo "  # Edit with your credentials"
         exit 1
     fi
 
@@ -267,9 +226,6 @@ EOF
 
 # Main
 case "${1:-}" in
-    --init)
-        cmd_init
-        ;;
     --validate)
         cmd_validate
         ;;

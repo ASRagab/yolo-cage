@@ -1,53 +1,46 @@
-# yolo-cage Development Context
+# yolo-cage
 
-## What This Is
+Run Claude Code in a sandboxed Kubernetes environment with git branch isolation.
 
-yolo-cage is a product for public release on Show HN. It lets developers run Claude Code in a sandboxed VM with git branch isolation.
+## Quick Start
 
-## The Product
-
-The user runs `vagrant up` and gets a working yolo-cage VM. That's it. No bespoke setup, no "works on my machine," no special infrastructure.
-
-## Current Task
-
-Build and test the deterministic VM build:
-1. `vagrant up` provisions a fresh Ubuntu VM
-2. `build-release.sh` installs everything
-3. User runs `yolo-cage-configure` with their credentials
-4. User runs `yolo-cage create <branch>` to start working
-
-## What NOT To Do
-
-- Do NOT suggest testing on ark or any existing infrastructure
-- Do NOT add flags or options for "flexibility"
-- Do NOT try to support arbitrary Kubernetes clusters
-- Do NOT shortcut the VM testing - the VM IS the product
-
-## CI Requirements
-
-**The main branch must always build successfully in CI.**
-
-Before merging any PR:
-1. `vagrant up` must complete without errors
-2. The resulting VM must be ready for `yolo-cage-configure`
-
-WIP branches can be broken, but nothing gets merged to main unless CI passes.
-
-## Environment
-
-- Development machine: ark (Ubuntu server, headless)
-- Vagrant provider: libvirt/KVM (NOT VirtualBox - this is a server)
-- Target: Fresh Ubuntu 22.04 VM
-
-## Testing
-
-After `vagrant up` completes, test with:
 ```bash
+vagrant up                    # Build the VM
+vagrant ssh                   # Connect to VM
+cp config.yaml.example ~/.yolo-cage/config.yaml
+# Edit config.yaml with your credentials
+yolo-cage-configure           # Apply configuration
+yolo-cage create my-branch    # Create a sandbox
+yolo-cage attach my-branch    # Connect to it
+```
+
+## Architecture
+
+- **Vagrant VM**: Self-contained MicroK8s cluster
+- **Dispatcher**: Manages git operations and pod lifecycle
+- **Sandbox pods**: Isolated environments per branch
+- **Egress proxy**: Filters outbound traffic
+
+## Development
+
+### Prerequisites
+
+- Vagrant with libvirt provider (for headless servers) or VirtualBox
+- 8GB RAM, 4 CPUs available for the VM
+
+### Testing changes
+
+```bash
+vagrant destroy -f && vagrant up   # Full rebuild
 vagrant ssh
-yolo-cage-configure --init
-# Edit ~/.yolo-cage/config.yaml with your credentials
 yolo-cage-configure
 yolo-cage create test-branch
 yolo-cage list
 yolo-cage delete test-branch
 ```
+
+### CI Requirements
+
+The main branch must always build successfully:
+1. `vagrant up` completes without errors
+2. `yolo-cage-configure` can apply a valid config

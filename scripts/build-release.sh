@@ -1,10 +1,10 @@
 #!/bin/bash
-# build-release.sh - Build yolo-cage in a fresh Ubuntu 22.04 VM
+# build-release.sh - Provision a yolo-cage environment
 #
-# This script runs during VM provisioning (vagrant up) and sets up
-# a complete yolo-cage environment. The VM is the product.
+# Called by Vagrant during `vagrant up`. Installs MicroK8s, builds container
+# images, deploys manifests, and installs the CLI tools.
 #
-# Prerequisites: Fresh Ubuntu 22.04 with this repo at /home/vagrant/yolo-cage
+# Prerequisites: Fresh Ubuntu 22.04 VM with this repo synced to /home/vagrant/yolo-cage
 
 set -e
 

@@ -23,6 +23,20 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="yolo-cage Git Dispatcher", version="0.2.0")
 
 
+def handle_pod_operation(operation_name: str, func, *args, **kwargs):
+    """Execute a pod operation with consistent error handling.
+
+    Re-raises HTTPException as-is, converts other exceptions to 500.
+    """
+    try:
+        return func(*args, **kwargs)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"{operation_name}: {e}")
+        raise HTTPException(500, str(e))
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint."""
@@ -108,54 +122,33 @@ async def handle_gh(gh_req: GhRequest, request: Request):
 async def create_pod(req: PodCreateRequest):
     """Create a new pod for a branch."""
     logger.info(f"Create pod requested for branch: {req.branch}")
-    try:
-        return pods.create_pod(req.branch)
-    except Exception as e:
-        logger.error(f"Failed to create pod: {e}")
-        raise HTTPException(500, str(e))
+    return handle_pod_operation("Failed to create pod", pods.create_pod, req.branch)
 
 
 @app.get("/pods", response_model=PodListResponse)
 async def list_pods():
     """List all yolo-cage pods."""
-    try:
-        pod_list = pods.list_pods()
-        return PodListResponse(pods=pod_list)
-    except Exception as e:
-        logger.error(f"Failed to list pods: {e}")
-        raise HTTPException(500, str(e))
+    pod_list = handle_pod_operation("Failed to list pods", pods.list_pods)
+    return PodListResponse(pods=pod_list)
 
 
 @app.get("/pods/{branch}", response_model=PodInfo)
 async def get_pod(branch: str):
     """Get status of a specific pod."""
-    try:
+    def get_or_404():
         pod = pods.get_pod(branch)
         if pod is None:
             raise HTTPException(404, f"Pod for branch '{branch}' not found")
         return pod
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get pod: {e}")
-        raise HTTPException(500, str(e))
+    return handle_pod_operation("Failed to get pod", get_or_404)
 
 
 @app.delete("/pods/{branch}")
 async def delete_pod(branch: str, clean: bool = False):
     """Delete a pod. Use ?clean=true to also delete the workspace."""
     logger.info(f"Delete pod requested for branch: {branch} (clean={clean})")
-    try:
-        deleted = pods.delete_pod(branch, clean_workspace=clean)
-        if not deleted:
+    def delete_or_404():
+        if not pods.delete_pod(branch, clean_workspace=clean):
             raise HTTPException(404, f"Pod for branch '{branch}' not found")
-        return {
-            "status": "deleted",
-            "branch": branch,
-            "workspace_cleaned": clean
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete pod: {e}")
-        raise HTTPException(500, str(e))
+        return {"status": "deleted", "branch": branch, "workspace_cleaned": clean}
+    return handle_pod_operation("Failed to delete pod", delete_or_404)
