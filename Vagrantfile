@@ -14,8 +14,8 @@ Vagrant.configure("2") do |config|
 
   # Use libvirt provider (for headless servers)
   config.vm.provider "libvirt" do |lv|
-    lv.memory = 8192
-    lv.cpus = 4
+    lv.memory = 32768
+    lv.cpus = 8
   end
 
   # Sync repo into VM
@@ -28,8 +28,8 @@ Vagrant.configure("2") do |config|
     yolo-cage VM ready.
 
     vagrant ssh
-    yolo-cage-configure --init
-    # edit ~/.yolo-cage/config.yaml
+    cp /home/vagrant/yolo-cage/config.yaml.example ~/.yolo-cage/config.yaml
+    nano ~/.yolo-cage/config.yaml   # Add your GitHub PAT and repo URL
     yolo-cage-configure
     yolo-cage create my-branch
   MSG
