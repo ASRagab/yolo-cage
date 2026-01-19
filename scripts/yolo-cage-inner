@@ -53,8 +53,8 @@ cmd_list() {
     local url=$(dispatcher_url)
     curl -s "${url}/pods" | jq -r '
         .pods |
-        ["NAME", "BRANCH", "STATUS", "IP"],
-        (.[] | [.name, .branch, .status, (.ip // "-")]) |
+        ["BRANCH", "STATUS"],
+        (.[] | [.branch, .status]) |
         @tsv' | column -t
 }
 
@@ -118,8 +118,8 @@ case "${1:-}" in
         echo "Usage:"
         echo "  yolo-cage-inner create <branch>        Create pod"
         echo "  yolo-cage-inner list                   List pods"
-        echo "  yolo-cage-inner attach <branch>        Attach to pod (Claude)"
-        echo "  yolo-cage-inner shell <branch>         Attach to pod (bash)"
+        echo "  yolo-cage-inner attach <branch>        Start interactive Claude Code session"
+        echo "  yolo-cage-inner shell <branch>         Open shell in pod"
         echo "  yolo-cage-inner delete <branch>        Delete pod"
         echo "  yolo-cage-inner logs <branch>          Tail logs"
         exit 1

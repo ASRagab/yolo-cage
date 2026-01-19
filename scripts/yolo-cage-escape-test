@@ -87,7 +87,7 @@ if [[ -z "$BRANCH" ]]; then
     exit 1
 fi
 
-WORKSPACE="/workspaces/$BRANCH"
+WORKSPACE="/home/dev/workspace"
 if [[ ! -d "$WORKSPACE/.git" ]]; then
     echo "Error: No git repository at $WORKSPACE"
     exit 1
