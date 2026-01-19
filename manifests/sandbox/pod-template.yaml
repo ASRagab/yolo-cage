@@ -34,25 +34,52 @@ spec:
         - name: ca-bundle
           mountPath: /ca-bundle
 
-    # Ensure shared Claude Code state exists (credentials + config)
+    # Initialize per-branch Claude Code state (credentials + config)
     - name: setup-claude-home
       image: python:3.12-slim-bookworm
+      env:
+        - name: BRANCH
+          value: "${BRANCH}"
+        - name: CLAUDE_OAUTH
+          valueFrom:
+            secretKeyRef:
+              name: yolo-cage-credentials
+              key: CLAUDE_OAUTH
+              optional: true
       command:
         - /bin/sh
         - -c
         - |
-          # Create .claude directory if it doesn't exist
-          mkdir -p /pvc/.claude
+          set -e
+          # Store claude state separately from workspace to avoid polluting git
+          STATE_DIR="/pvc/.claude-state/${BRANCH}"
+          CLAUDE_DIR="${STATE_DIR}/.claude"
+          CLAUDE_JSON="${STATE_DIR}/.claude.json"
 
-          # Create .claude.json if it doesn't exist (Claude Code config file)
-          # Must exist before main container starts so subPath mounts as file, not directory
-          if [ ! -f /pvc/.claude.json ]; then
-            echo '{}' > /pvc/.claude.json
+          # Create per-branch .claude directory
+          mkdir -p "${CLAUDE_DIR}"
+
+          # Create .claude.json with minimal state to skip onboarding
+          if [ ! -f "${CLAUDE_JSON}" ]; then
+            cat > "${CLAUDE_JSON}" <<'EOF'
+          {
+            "hasCompletedOnboarding": true,
+            "lastOnboardingVersion": "2.0.0"
+          }
+          EOF
           fi
 
-          # Only create CLAUDE.md if it doesn't exist (preserve any manual edits)
-          if [ ! -f /pvc/.claude/CLAUDE.md ]; then
-            cat > /pvc/.claude/CLAUDE.md <<'CLAUDE_EOF'
+          # Write credentials if CLAUDE_OAUTH is provided
+          if [ -n "${CLAUDE_OAUTH}" ]; then
+            cat > "${CLAUDE_DIR}/.credentials.json" <<CREDS_EOF
+          ${CLAUDE_OAUTH}
+          CREDS_EOF
+            chmod 600 "${CLAUDE_DIR}/.credentials.json"
+          fi
+
+          # Create CLAUDE.md if it doesn't exist
+          if [ ! -f "${CLAUDE_DIR}/CLAUDE.md" ]; then
+            cat > "${CLAUDE_DIR}/CLAUDE.md" <<'CLAUDE_EOF'
           # yolo-cage Environment
 
           You are running inside yolo-cage, a sandboxed environment for autonomous development.
@@ -144,10 +171,10 @@ spec:
           subPath: ${BRANCH}
         - name: workspaces
           mountPath: /home/dev/.claude
-          subPath: .claude
+          subPath: .claude-state/${BRANCH}/.claude
         - name: workspaces
           mountPath: /home/dev/.claude.json
-          subPath: .claude.json
+          subPath: .claude-state/${BRANCH}/.claude.json
         - name: proxy-ca
           mountPath: /etc/ssl/certs/mitmproxy-ca.pem
           subPath: mitmproxy-ca.pem
