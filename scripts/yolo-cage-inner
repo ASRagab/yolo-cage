@@ -45,7 +45,7 @@ cmd_create() {
         echo "Waiting for pod to be ready..."
         kubectl wait --for=condition=Ready pod/${pod} -n ${NAMESPACE} --timeout=120s
         echo ""
-        echo "Pod ready. Run: yolo-cage-inner attach ${branch}"
+        echo "Pod ready. Run: yolo-cage attach ${branch}"
     fi
 }
 
@@ -73,9 +73,9 @@ cmd_shell() {
     [[ -z "$branch" ]] && { echo "Usage: yolo-cage-inner shell <branch>"; exit 1; }
 
     local pod=$(pod_name "$branch")
-    echo "Opening shell in ${pod}..."
+    echo "Attaching shell to ${pod}... (Ctrl+B,D to detach)"
     kubectl exec -it -n ${NAMESPACE} ${pod} -- \
-        bash -c 'cd /home/dev/workspace && exec bash'
+        bash -c 'cd /home/dev/workspace && exec tmux new-session -A -s shell'
 }
 
 cmd_delete() {
