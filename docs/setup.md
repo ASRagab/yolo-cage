@@ -203,17 +203,14 @@ sudo mv yolo-cage /usr/local/bin/
 yolo-cage build --interactive --up
 ```
 
-### Upgrade (keep config)
+### Upgrade to latest version
 
 ```bash
-# Rebuild VM with existing config
-yolo-cage rebuild
+# Update CLI and repo (keeps VM running)
+yolo-cage upgrade
 
-# Or to also update the CLI:
-curl -fsSL https://github.com/borenstein/yolo-cage/releases/latest/download/yolo-cage -o yolo-cage
-chmod +x yolo-cage
-sudo mv yolo-cage /usr/local/bin/
-yolo-cage rebuild
+# Update CLI, repo, and rebuild VM
+yolo-cage upgrade --rebuild
 ```
 
 ## Next Steps

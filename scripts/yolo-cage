@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "dev"
+YOLO_CAGE_VERSION="dev"  # Replaced by release workflow
 YOLO_CAGE_HOME = Path(os.environ.get("YOLO_CAGE_HOME", Path.home() / ".yolo-cage"))
 YOLO_CAGE_REPO = "https://github.com/borenstein/yolo-cage.git"
 
@@ -402,6 +402,74 @@ def cmd_port_forward(args: argparse.Namespace) -> None:
         print("\nPort forwarding stopped.")
 
 
+def cmd_upgrade(args: argparse.Namespace) -> None:
+    """Upgrade yolo-cage to the latest version."""
+    import tempfile
+    import urllib.request
+
+    repo_dir = detect_repo_dir()
+
+    # Step 1: Update the CLI binary
+    log_step("Downloading latest yolo-cage CLI...")
+    cli_url = "https://github.com/borenstein/yolo-cage/releases/latest/download/yolo-cage"
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            urllib.request.urlretrieve(cli_url, tmp.name)
+            tmp_path = tmp.name
+
+        # Make executable and move to /usr/local/bin
+        os.chmod(tmp_path, 0o755)
+        target = "/usr/local/bin/yolo-cage"
+
+        # Try to copy (may need sudo)
+        try:
+            shutil.copy(tmp_path, target)
+            log_success("CLI updated")
+        except PermissionError:
+            print(f"Need sudo to update {target}")
+            result = subprocess.run(["sudo", "cp", tmp_path, target])
+            if result.returncode == 0:
+                log_success("CLI updated")
+            else:
+                die("Failed to update CLI")
+        finally:
+            os.unlink(tmp_path)
+
+    except Exception as e:
+        die(f"Failed to download CLI: {e}")
+
+    # Step 2: Update the repo
+    if repo_dir and repo_dir == YOLO_CAGE_HOME / "repo":
+        log_step("Updating repository...")
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            log_success("Repository updated")
+        else:
+            log_error(f"Failed to update repository: {result.stderr}")
+            print("You may need to manually resolve conflicts in ~/.yolo-cage/repo")
+    elif repo_dir:
+        print(f"Skipping repo update (running from dev repo: {repo_dir})")
+
+    # Step 3: Optionally rebuild VM
+    if args.rebuild:
+        if not repo_dir:
+            die("No repository found. Run 'yolo-cage build' first.")
+        log_step("Rebuilding VM with updated code...")
+        subprocess.run(["vagrant", "destroy", "-f"], cwd=repo_dir)
+        subprocess.run(["vagrant", "up"], cwd=repo_dir, check=True)
+        sync_config_to_vm()
+        log_success("VM rebuilt")
+    else:
+        print()
+        print("CLI and repo updated. Run 'yolo-cage rebuild' to update the VM.")
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     """Show VM and pod status."""
     repo_dir = detect_repo_dir()
@@ -443,14 +511,14 @@ def main() -> None:
     parser.add_argument(
         "--version", "-v", "--v",
         action="version",
-        version=f"yolo-cage {VERSION}",
+        version=f"yolo-cage {YOLO_CAGE_VERSION}",
     )
 
     subparsers = parser.add_subparsers(dest="command", metavar="<command>")
 
     # version (subcommand alias for --version)
     def cmd_version(args: argparse.Namespace) -> None:
-        print(f"yolo-cage {VERSION}")
+        print(f"yolo-cage {YOLO_CAGE_VERSION}")
 
     p_version = subparsers.add_parser(
         "version",
@@ -488,6 +556,19 @@ def main() -> None:
         description="Destroy the current VM and rebuild it from scratch. Your config.env will be preserved.",
     )
     p_rebuild.set_defaults(func=cmd_rebuild)
+
+    # upgrade
+    p_upgrade = subparsers.add_parser(
+        "upgrade",
+        help="Upgrade to latest version",
+        description="Download the latest CLI, update the repo, and optionally rebuild the VM.",
+    )
+    p_upgrade.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Also rebuild the VM after upgrading",
+    )
+    p_upgrade.set_defaults(func=cmd_upgrade)
 
     # up
     p_up = subparsers.add_parser(
