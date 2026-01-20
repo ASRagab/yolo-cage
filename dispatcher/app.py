@@ -6,12 +6,13 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from . import registry
+from .registry import AlreadyRegisteredError
 from . import pods
 from .handlers import git as git_handler
 from .handlers import gh as gh_handler
 from .bootstrap import bootstrap_workspace, BootstrapError
 from .models import GitRequest, GhRequest, PodCreateRequest, PodInfo, PodListResponse, PodCreateResponse
-from .paths import translate_cwd
+from .paths import translate_cwd, InvalidPathError
 
 
 logging.basicConfig(
@@ -45,9 +46,12 @@ async def health():
 
 @app.post("/register")
 async def register_pod(request: Request, branch: str):
-    """Register a pod IP -> branch mapping."""
+    """Register a pod IP -> branch mapping. Rejects re-registration attempts."""
     client_ip = request.client.host
-    registry.register(client_ip, branch)
+    try:
+        registry.register(client_ip, branch)
+    except AlreadyRegisteredError as e:
+        raise HTTPException(409, str(e))
     return {"status": "registered", "ip": client_ip, "branch": branch}
 
 
@@ -95,7 +99,12 @@ async def handle_git(git_req: GitRequest, request: Request):
         logger.warning(f"Unregistered pod {client_ip} attempted git operation")
         raise HTTPException(403, "yolo-cage: pod not registered. Contact cluster admin.")
 
-    cwd = translate_cwd(git_req.cwd, assigned_branch)
+    try:
+        cwd = translate_cwd(git_req.cwd, assigned_branch)
+    except InvalidPathError as e:
+        logger.warning(f"Invalid path from {client_ip}: {e}")
+        raise HTTPException(400, f"yolo-cage: {e}")
+
     logger.info(f"Git from {client_ip} ({assigned_branch}): {git_req.args}")
 
     return git_handler.handle(git_req.args, cwd, assigned_branch)
@@ -111,7 +120,12 @@ async def handle_gh(gh_req: GhRequest, request: Request):
         logger.warning(f"Unregistered pod {client_ip} attempted gh operation")
         raise HTTPException(403, "yolo-cage: pod not registered. Contact cluster admin.")
 
-    cwd = translate_cwd(gh_req.cwd, assigned_branch)
+    try:
+        cwd = translate_cwd(gh_req.cwd, assigned_branch)
+    except InvalidPathError as e:
+        logger.warning(f"Invalid path from {client_ip}: {e}")
+        raise HTTPException(400, f"yolo-cage: {e}")
+
     logger.info(f"gh from {client_ip} ({assigned_branch}): {gh_req.args}")
 
     return gh_handler.handle(gh_req.args, cwd)

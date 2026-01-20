@@ -9,8 +9,17 @@ logger = logging.getLogger(__name__)
 _registry: dict[str, str] = {}
 
 
+class AlreadyRegisteredError(Exception):
+    """Raised when a pod attempts to re-register."""
+    pass
+
+
 def register(pod_ip: str, branch: str) -> None:
-    """Register a pod for a branch."""
+    """Register a pod for a branch. Raises AlreadyRegisteredError if already registered."""
+    if pod_ip in _registry:
+        existing_branch = _registry[pod_ip]
+        logger.warning(f"Pod {pod_ip} attempted re-registration for {branch} (already registered for {existing_branch})")
+        raise AlreadyRegisteredError(f"Pod already registered for branch '{existing_branch}'")
     _registry[pod_ip] = branch
     logger.info(f"Registered pod {pod_ip} for branch {branch}")
 
