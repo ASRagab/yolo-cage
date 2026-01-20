@@ -196,6 +196,14 @@ The following attack vectors are NOT fully mitigated:
 2. **Timing Side Channels** - Information could be leaked via response timing patterns
 3. **Steganography** - Secrets could be hidden in images or other binary data
 
+### Port Forwarding Considerations
+
+When using `yolo-cage port-forward`, be aware:
+
+- **Not an exfiltration vector** - data flows inbound (host→pod), not outbound
+- **Malicious content risk** - agent could serve XSS/phishing content; treat as untrusted
+- **LAN exposure** - `--bind 0.0.0.0` exposes the port to your local network
+
 The recommended mitigations are:
 
 - Use **scoped credentials** with minimal permissions
