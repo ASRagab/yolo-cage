@@ -86,6 +86,8 @@ One sandbox per branch. Agents can only push to their assigned branch. All outbo
 | `delete <branch>` | Delete sandbox |
 | `port-forward <branch> <port>` | Forward port from sandbox |
 | `up` / `down` | Start/stop VM |
+| `upgrade [--rebuild]` | Upgrade to latest version |
+| `version` | Show version |
 
 ### Port forwarding
 

@@ -162,6 +162,57 @@ yolo-cage rebuild
 
 This destroys the VM and rebuilds it, preserving your config.
 
+## Uninstall
+
+### Remove everything
+
+```bash
+# Destroy the VM and all data
+yolo-cage destroy
+
+# Remove config and cloned repo
+rm -rf ~/.yolo-cage
+
+# Remove the CLI
+sudo rm /usr/local/bin/yolo-cage
+```
+
+### Keep config, remove VM
+
+```bash
+# Destroy just the VM (keeps ~/.yolo-cage/config.env)
+yolo-cage destroy
+```
+
+## Reinstall
+
+### Fresh install (new config)
+
+```bash
+# Remove everything
+yolo-cage destroy
+rm -rf ~/.yolo-cage
+sudo rm /usr/local/bin/yolo-cage
+
+# Download latest release
+curl -fsSL https://github.com/borenstein/yolo-cage/releases/latest/download/yolo-cage -o yolo-cage
+chmod +x yolo-cage
+sudo mv yolo-cage /usr/local/bin/
+
+# Build with new config
+yolo-cage build --interactive --up
+```
+
+### Upgrade to latest version
+
+```bash
+# Update CLI and repo (keeps VM running)
+yolo-cage upgrade
+
+# Update CLI, repo, and rebuild VM
+yolo-cage upgrade --rebuild
+```
+
 ## Next Steps
 
 - Read [Architecture](architecture.md) to understand the security model
