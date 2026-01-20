@@ -41,6 +41,25 @@ chmod +x yolo-cage
 sudo mv yolo-cage /usr/local/bin/
 ```
 
+### Install from Repository
+
+To run from the repo (for testing PRs, development, or unreleased features):
+
+```bash
+git clone https://github.com/borenstein/yolo-cage.git
+cd yolo-cage
+./scripts/yolo-cage build --interactive --up
+```
+
+All commands work the same way - just use `./scripts/yolo-cage` instead of `yolo-cage`.
+
+**Testing a PR:**
+
+```bash
+gh pr checkout 38
+./scripts/yolo-cage rebuild
+```
+
 ## Quick Start
 
 ### Option A: Interactive Setup
