@@ -9,7 +9,12 @@
 #   vagrant destroy -f # Delete VM
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/ubuntu2204"
+  # Use ARM64 box on Apple Silicon, x86 box elsewhere
+  if RUBY_PLATFORM.include?("arm64") || RUBY_PLATFORM.include?("aarch64")
+    config.vm.box = "perk/ubuntu-2204-arm64"
+  else
+    config.vm.box = "generic/ubuntu2204"
+  end
   config.vm.hostname = "yolo-cage"
 
   # libvirt provider (Linux)
@@ -22,7 +27,6 @@ Vagrant.configure("2") do |config|
   config.vm.provider "qemu" do |qe|
     qe.memory = "8G"
     qe.smp = 4
-    qe.arch = "aarch64"
   end
 
   # Sync repo into VM
