@@ -84,7 +84,18 @@ One sandbox per branch. Agents can only push to their assigned branch. All outbo
 | `shell <branch>` | Attach (bash) |
 | `list` | List sandboxes |
 | `delete <branch>` | Delete sandbox |
+| `port-forward <branch> <port>` | Forward port from sandbox |
 | `up` / `down` | Start/stop VM |
+
+### Port forwarding
+
+Access web apps running inside a sandbox:
+
+```bash
+yolo-cage port-forward feature-x 8080           # localhost:8080 → pod:8080
+yolo-cage port-forward feature-x 9000:3000      # localhost:9000 → pod:3000
+yolo-cage port-forward feature-x 8080 --bind 0.0.0.0  # LAN accessible
+```
 
 See [Configuration](docs/configuration.md) for proxy bypass, hooks, and resource limits.
 
