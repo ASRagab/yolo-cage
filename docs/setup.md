@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- **Vagrant**: With libvirt provider (Linux/macOS) or VirtualBox (Linux only)
+- **Vagrant**: With libvirt provider (Linux) or QEMU (macOS)
 - **8GB RAM, 4 CPUs**: Available for the VM
 - **GitHub PAT**: With `repo` scope ([create one here](https://github.com/settings/tokens))
 - **Claude account**: Pro, Team, or Enterprise
