@@ -53,7 +53,7 @@ run_test() {
     exit_code=$?
 
     if [[ "$expect_fail" == "true" ]]; then
-        if [[ $exit_code -ne 0 ]] || [[ "$output" == *"yolo-cage:"* ]] || [[ "$output" == *"Blocked:"* ]]; then
+        if [[ $exit_code -ne 0 ]] || [[ "$output" == *"yolo-cage:"* ]] || [[ "$output" == *"Blocked:"* ]] || [[ "$output" == *'"detail":'* ]]; then
             if [[ -n "$expect_msg" ]] && [[ "$output" != *"$expect_msg"* ]]; then
                 log_fail "$name (wrong message: expected '$expect_msg')"
                 if [[ "$VERBOSE" == "--verbose" ]]; then
@@ -101,6 +101,28 @@ echo "========================================"
 echo "Branch: $BRANCH"
 echo "Workspace: $WORKSPACE"
 echo ""
+
+# ============================================
+# Dispatcher Security Tests
+# ============================================
+log_test "Dispatcher Security Tests"
+
+# Test that pod identity is immutable (cannot re-register for a different branch)
+run_test "Registration hijacking (re-register for main)" \
+    "curl -s -X POST 'http://git-dispatcher:8080/register?branch=main'" \
+    "true" \
+    "already registered"
+
+# Test that path traversal is blocked (cannot access other workspaces)
+run_test "Path traversal via raw path" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"args\": [\"status\"], \"cwd\": \"/workspaces/main\"}' 'http://git-dispatcher:8080/git'" \
+    "true" \
+    "Path must be within"
+
+run_test "Path traversal via relative escape" \
+    "curl -s -X POST -H 'Content-Type: application/json' -d '{\"args\": [\"status\"], \"cwd\": \"/home/dev/workspace/../../../workspaces/main\"}' 'http://git-dispatcher:8080/git'" \
+    "true" \
+    "Path must be within"
 
 # ============================================
 # Git Branch Jumping Tests

