@@ -2,9 +2,9 @@
 
 This document explains how yolo-cage works and the security model it implements.
 
-## The Problem
+## The "Lethal Trifecta"
 
-You want AI coding agents working autonomously on your codebase without babysitting permission prompts. But YOLO mode (`--dangerously-skip-permissions`) feels irresponsible because agents have what Simon Willison calls the ["lethal trifecta"](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/):
+[Simon Willison](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) identified the "lethal trifecta" for AI agents:
 
 1. **Internet access** - for docs, APIs, package registries
 2. **Code execution** - that's the whole point
@@ -12,15 +12,31 @@ You want AI coding agents working autonomously on your codebase without babysitt
 
 Any two are manageable. All three together means the agent can read your secrets and send them anywhere.
 
-## The Solution
+You want AI coding agents working autonomously without babysitting permission prompts. But YOLO mode (`--dangerously-skip-permissions`) gives agents the lethal trifecta with no guardrails.
 
-yolo-cage runs Claude Code inside a VM with a single-node Kubernetes cluster. The agent can do whatever it wants inside its container, but all external communication is intercepted and controlled:
+## The Key Idea: Git Dispatcher
 
-- **Git operations** go through a dispatcher that enforces branch isolation
-- **HTTP/HTTPS traffic** goes through a proxy that scans for secrets
-- **Network policy** restricts what the container can reach
+The core innovation is intercepting git at the application layer. Every `git` and `gh` command from the agent goes through a dispatcher that enforces policy:
 
-The container boundary is the sandbox. The dispatcher and proxy are the controls.
+- **Branch isolation**: Agents can only push to their assigned branch
+- **No merging**: Agents can open PRs but cannot merge them
+- **No escape**: Can't push to URLs, can't add remotes, can't clone other repos
+
+This enforces **"agent proposes, human disposes"** - the agent does the work, you review and merge.
+
+The dispatcher also runs TruffleHog before every push to catch secrets in commits.
+
+## Defense in Depth
+
+The git dispatcher is backed by multiple layers. An attacker would need to bypass all of them:
+
+1. **Git shim** - Intercepts commands before they reach real git
+2. **Dispatcher** - Validates and executes git operations
+3. **Pre-push hooks** - TruffleHog scans for secrets
+4. **Egress proxy** - Scans all HTTP/HTTPS for credential patterns
+5. **Network policy** - Restricts what pods can reach
+
+See Wikipedia's article on [defense in depth](https://en.wikipedia.org/wiki/Defense_in_depth_(computing)) for background on this security strategy.
 
 ## System Overview
 
@@ -73,36 +89,9 @@ The container boundary is the sandbox. The dispatcher and proxy are the controls
 
 ## Components
 
-### Host CLI (`yolo-cage`)
-
-The command-line interface that runs on your machine. It manages the VM lifecycle and delegates pod operations to the VM:
-
-- `yolo-cage build` - Clone repo, configure, create VM
-- `yolo-cage up/down` - Start/stop VM
-- `yolo-cage create/attach/delete` - Manage sandbox pods
-
-### Vagrant VM
-
-An Ubuntu 22.04 VM running MicroK8s (single-node Kubernetes). The VM provides:
-
-- Isolation from your host system
-- A Kubernetes environment for running pods
-- Network control via Kubernetes NetworkPolicy
-
-### Sandbox Pods
-
-Each agent runs in its own Kubernetes pod with:
-
-- **Claude Code** in YOLO mode (no permission prompts)
-- **tmux** for session persistence across disconnects
-- **Git/gh shims** that intercept commands and route them to the dispatcher
-- **Proxy environment variables** that route HTTP/HTTPS through the egress proxy
-
-Pods run as a non-root user (UID 1000) with no host filesystem access.
-
 ### Git Dispatcher
 
-A FastAPI service that intercepts all git and GitHub CLI operations:
+A FastAPI service that intercepts all git and GitHub CLI operations. This is the enforcement point for branch isolation.
 
 **Git command classification:**
 - `LOCAL` - No restrictions: add, commit, status, log, diff, etc.
@@ -147,6 +136,17 @@ An mitmproxy instance that intercepts all HTTP/HTTPS traffic:
 - Blocks `DELETE /repos/*` (repo deletion)
 - Blocks webhook and branch protection modifications
 
+### Sandbox Pods
+
+Each agent runs in its own Kubernetes pod with:
+
+- **Claude Code** in YOLO mode (no permission prompts)
+- **tmux** for session persistence across disconnects
+- **Git/gh shims** that intercept commands and route them to the dispatcher
+- **Proxy environment variables** that route HTTP/HTTPS through the egress proxy
+
+Pods run as a non-root user (UID 1000) with no host filesystem access.
+
 ### Network Policy
 
 Kubernetes NetworkPolicy restricts pod network access:
@@ -155,6 +155,22 @@ Kubernetes NetworkPolicy restricts pod network access:
 - **Blocked:** SSH (22), all other ports
 
 The only way out is through the dispatcher (for git) or the proxy (for HTTP/HTTPS).
+
+### Host CLI (`yolo-cage`)
+
+The command-line interface that runs on your machine. It manages the VM lifecycle and delegates pod operations to the VM:
+
+- `yolo-cage build` - Clone repo, configure, create VM
+- `yolo-cage up/down` - Start/stop VM
+- `yolo-cage create/attach/delete` - Manage sandbox pods
+
+### Vagrant VM
+
+An Ubuntu 22.04 VM running MicroK8s (single-node Kubernetes). The VM provides:
+
+- Isolation from your host system
+- A Kubernetes environment for running pods
+- Network control via Kubernetes NetworkPolicy
 
 ## Security Properties
 
@@ -175,16 +191,6 @@ The only way out is through the dispatcher (for git) or the proxy (for HTTP/HTTP
 - Exfiltrate secrets through HTTP/HTTPS
 - Bypass the dispatcher for git operations
 - Access GitHub API directly (blocked at proxy)
-
-### Defense in Depth
-
-Multiple layers must fail for an escape:
-
-1. **Git shim** - Must be bypassed to reach real git
-2. **Dispatcher** - Must allow the operation
-3. **Pre-push hooks** - Must not detect secrets
-4. **Egress proxy** - Must not detect secrets in HTTP
-5. **Network policy** - Must allow the traffic
 
 ## Known Limitations
 
