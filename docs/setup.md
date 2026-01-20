@@ -57,7 +57,7 @@ All commands work the same way - just use `./scripts/yolo-cage` instead of `yolo
 
 ```bash
 gh pr checkout 38
-./scripts/yolo-cage rebuild
+./scripts/yolo-cage build
 ```
 
 ## Quick Start
@@ -176,10 +176,10 @@ vagrant ssh -c "kubectl logs -n yolo-cage deployment/git-dispatcher"
 
 If something goes wrong:
 ```bash
-yolo-cage rebuild
+yolo-cage build
 ```
 
-This destroys the VM and rebuilds it, preserving your config.
+This destroys any existing VM and rebuilds it, preserving your config.
 
 ## Uninstall
 

@@ -179,7 +179,7 @@ end
 Then rebuild:
 
 ```bash
-yolo-cage rebuild
+yolo-cage build
 ```
 
 ## Multiple Repositories

@@ -233,11 +233,10 @@ def sync_config_to_vm() -> None:
 
 def cmd_build(args: argparse.Namespace) -> None:
     """Set up yolo-cage (clone repo, build VM)."""
-    if not args.config_file and not args.interactive:
-        die("Must specify --config-file or --interactive")
-
     check_prerequisites()
     YOLO_CAGE_HOME.mkdir(parents=True, exist_ok=True)
+
+    existing_config = YOLO_CAGE_HOME / "config.env"
 
     # Handle config
     if args.config_file:
@@ -246,8 +245,18 @@ def cmd_build(args: argparse.Namespace) -> None:
             die(f"Config file not found: {config_file}")
         shutil.copy(config_file, YOLO_CAGE_HOME / "config.env")
         log_success(f"Config copied to {YOLO_CAGE_HOME / 'config.env'}")
-    else:
+    elif args.interactive:
         prompt_config()
+    elif existing_config.exists():
+        log_success(f"Using existing config: {existing_config}")
+    else:
+        die(
+            f"No configuration found.\n\n"
+            f"Either:\n"
+            f"  - Run with --interactive to create one\n"
+            f"  - Run with --config-file to use an existing file\n"
+            f"  - Create {existing_config} manually"
+        )
 
     # Clone repo if needed
     repo_dir = detect_repo_dir()
@@ -259,6 +268,12 @@ def cmd_build(args: argparse.Namespace) -> None:
         )
         repo_dir = YOLO_CAGE_HOME / "repo"
         log_success("Repository cloned")
+
+    # Destroy existing VM if present
+    vagrant_dir = repo_dir / ".vagrant"
+    if vagrant_dir.exists():
+        log_step("Destroying existing VM...")
+        subprocess.run(["vagrant", "destroy", "-f"], cwd=repo_dir)
 
     # Build VM
     log_step("Building VM (this may take a while)...")
@@ -279,29 +294,6 @@ def cmd_build(args: argparse.Namespace) -> None:
         print("Create a sandbox:  yolo-cage create <branch>")
         print("List sandboxes:    yolo-cage list")
         print("Attach to sandbox: yolo-cage attach <branch>")
-
-
-def cmd_rebuild(args: argparse.Namespace) -> None:
-    """Destroy and rebuild the VM (preserves config)."""
-    repo_dir = ensure_repo()
-
-    print("This will destroy the current VM and rebuild it.")
-    print(f"Your config in {YOLO_CAGE_HOME / 'config.env'} will be preserved.")
-    print()
-    confirm = input("Continue? [y/N] ").strip().lower()
-
-    if confirm not in ("y", "yes"):
-        print("Aborted.")
-        return
-
-    log_step("Destroying existing VM...")
-    subprocess.run(["vagrant", "destroy", "-f"], cwd=repo_dir)
-
-    log_step("Rebuilding VM...")
-    subprocess.run(["vagrant", "up"], cwd=repo_dir, check=True)
-
-    sync_config_to_vm()
-    log_success("VM rebuilt successfully!")
 
 
 def cmd_up(args: argparse.Namespace) -> None:
@@ -503,7 +495,7 @@ def cmd_upgrade(args: argparse.Namespace) -> None:
         log_success("VM rebuilt")
     else:
         print()
-        print("CLI and repo updated. Run 'yolo-cage rebuild' to update the VM.")
+        print("CLI and repo updated. Run 'yolo-cage build' to update the VM.")
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -584,14 +576,6 @@ def main() -> None:
         help="Keep VM running after build",
     )
     p_build.set_defaults(func=cmd_build)
-
-    # rebuild
-    p_rebuild = subparsers.add_parser(
-        "rebuild",
-        help="Destroy and rebuild VM (preserves config)",
-        description="Destroy the current VM and rebuild it from scratch. Your config.env will be preserved.",
-    )
-    p_rebuild.set_defaults(func=cmd_rebuild)
 
     # upgrade
     p_upgrade = subparsers.add_parser(
