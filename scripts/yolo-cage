@@ -238,6 +238,14 @@ def sync_config_to_vm() -> None:
 def cmd_build(args: argparse.Namespace) -> None:
     """Set up yolo-cage (clone repo, build VM)."""
     check_prerequisites()
+
+    if sys.platform == "darwin":
+        print()
+        print(f"{YELLOW}Note: Apple Silicon support is experimental.{NC}")
+        print("The vagrant-qemu plugin has known limitations.")
+        print("For a more stable experience, consider VMware Fusion + vagrant-vmware-desktop.")
+        print()
+
     YOLO_CAGE_HOME.mkdir(parents=True, exist_ok=True)
 
     existing_config = YOLO_CAGE_HOME / "config.env"

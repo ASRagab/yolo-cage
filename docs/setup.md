@@ -25,11 +25,15 @@ sudo usermod -aG libvirt $USER
 # Log out and back in
 ```
 
-**macOS (QEMU):**
+**macOS (QEMU) - Experimental:**
 ```bash
 brew install vagrant qemu
 vagrant plugin install vagrant-qemu
 ```
+
+> ⚠️ **Apple Silicon support is experimental.** The vagrant-qemu plugin has known
+> limitations including unreliable port forwarding. For a more stable experience,
+> consider VMware Fusion (free) with the vagrant-vmware-desktop plugin ($79).
 
 ## Install
 
