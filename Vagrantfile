@@ -14,8 +14,8 @@ Vagrant.configure("2") do |config|
 
   # Use libvirt provider (for headless servers)
   config.vm.provider "libvirt" do |lv|
-    lv.memory = 32768
-    lv.cpus = 8
+    lv.memory = 8192
+    lv.cpus = 4
   end
 
   # Sync repo into VM

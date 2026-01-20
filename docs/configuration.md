@@ -216,7 +216,7 @@ data:
 
 The script:
 - Runs with the same user as the agent (non-root)
-- Has access to the cloned workspace at `/workspaces/{branch}`
+- Has access to the cloned workspace at `/home/dev/workspace`
 - Can install packages, configure tools, etc.
 - Fails the pod startup if it exits non-zero
 

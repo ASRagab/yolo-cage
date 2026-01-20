@@ -1,12 +1,30 @@
 # Customization Guide
 
-This guide covers advanced customizations beyond the standard [Configuration Reference](configuration.md). For most deployments, you only need to edit the manifest files directly.
+This guide covers advanced customizations beyond the standard [Configuration Reference](configuration.md).
 
 > **Note**: When customizing, maintain the security properties: non-root user, NetworkPolicy egress restrictions, and proxy-based scanning. Disabling these removes exfiltration controls.
 
-## Changing the Development Environment
+## Modifying Manifests
 
-### Adding Languages/Tools
+For advanced configuration, SSH into the VM and edit manifests directly:
+
+```bash
+vagrant ssh
+cd /home/vagrant/yolo-cage/manifests
+# Edit files as needed
+kubectl apply -f <file.yaml> -n yolo-cage
+```
+
+After modifying deployments, restart them to pick up changes:
+
+```bash
+kubectl rollout restart deployment/git-dispatcher -n yolo-cage
+kubectl rollout restart deployment/egress-proxy -n yolo-cage
+```
+
+## Adding Languages and Tools
+
+### Modifying the Sandbox Image
 
 Edit `dockerfiles/sandbox/Dockerfile` to add your stack:
 
@@ -18,30 +36,33 @@ RUN curl -LO https://go.dev/dl/go1.22.0.linux-amd64.tar.gz \
 ENV PATH="/usr/local/go/bin:$PATH"
 
 # Example: Add Rust
+USER root
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:$PATH"
+USER dev
 ```
 
-Rebuild and push:
+Then rebuild inside the VM:
+
 ```bash
-docker build -t <registry>/yolo-cage:latest -f dockerfiles/sandbox/Dockerfile .
-docker push <registry>/yolo-cage:latest
+vagrant ssh
+cd /home/vagrant/yolo-cage
+docker build -t localhost:32000/yolo-cage:latest -f dockerfiles/sandbox/Dockerfile .
+docker push localhost:32000/yolo-cage:latest
 ```
+
+New pods will use the updated image. Existing pods need to be deleted and recreated.
 
 ## Adding Secret Patterns
 
-### LLM-Guard Regex Patterns
+### LLM-Guard Configuration
 
-Edit `manifests/proxy/llm-guard-config.yaml` to add custom secret patterns:
+Edit `manifests/proxy/llm-guard.yaml` to add custom patterns to the args section:
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: llm-guard-config
-  namespace: yolo-cage
-data:
-  scanners.yml: |
+args:
+  - "--config"
+  - |
     input_scanners:
       - type: Secrets
         params:
@@ -54,163 +75,186 @@ data:
             - "AKIA[0-9A-Z]{16}"
             - "sk-ant-[a-zA-Z0-9-_]+"
             - "ghp_[a-zA-Z0-9]{36}"
-            - "github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}"
             # Add your custom patterns here
-            - "PRIVATE_KEY_[A-Za-z0-9]{32}"
             - "mycompany_api_[a-f0-9]{40}"
-          match_type: "search"
-          redact: true
-    output_scanners: []
-    settings:
-      lazy_load: false
-      low_cpu_mem_usage: true
 ```
 
-## Different Kubernetes Distributions
+After editing, apply and restart:
 
-### MicroK8s
-
-Default configuration. Uses `localhost:32000` registry.
-
-### k3s
-
-Use your configured registry or Docker Hub. Edit the `image:` fields in:
-- `manifests/dispatcher/deployment.yaml`
-- `manifests/proxy/egress-proxy.yaml`
-- `manifests/proxy/llm-guard.yaml`
-- `manifests/sandbox/pod-template.yaml`
-
-Example:
-```yaml
-spec:
-  containers:
-    - name: yolo-cage
-      image: docker.io/yourusername/yolo-cage:latest
-```
-
-### EKS/GKE/AKS
-
-Use ECR/GCR/ACR respectively. Update image references as above:
-
-```yaml
-image: 123456789.dkr.ecr.us-west-2.amazonaws.com/yolo-cage:latest
-```
-
-Ensure your nodes can pull from the registry (IAM roles, service accounts, etc.).
-
-### Kind (local development)
-
-Load images directly:
 ```bash
-docker build -t yolo-cage:latest -f dockerfiles/sandbox/Dockerfile .
-kind load docker-image yolo-cage:latest
+kubectl apply -f manifests/proxy/llm-guard.yaml -n yolo-cage
+kubectl rollout restart deployment/llm-guard -n yolo-cage
 ```
 
-Update deployments to use local images with `imagePullPolicy: Never`:
+## Modifying Blocked Domains
+
+Edit `manifests/proxy/configmap.yaml`:
+
 ```yaml
-spec:
-  containers:
-    - name: yolo-cage
-      image: yolo-cage:latest
-      imagePullPolicy: Never
+data:
+  BLOCKED_DOMAINS: |
+    [
+      "pastebin.com",
+      "paste.ee",
+      "your-blocked-site.com"
+    ]
 ```
 
-## Multiple Projects
+Apply and restart the proxy:
 
-For multiple projects, clone the repository once per project:
+```bash
+kubectl apply -f manifests/proxy/configmap.yaml -n yolo-cage
+kubectl rollout restart deployment/egress-proxy -n yolo-cage
+```
+
+## Modifying GitHub API Restrictions
+
+Edit `manifests/proxy/configmap.yaml`:
+
+```yaml
+data:
+  GITHUB_API_BLOCKED: |
+    [
+      ["PUT", "/repos/[^/]+/[^/]+/pulls/\\d+/merge"],
+      ["DELETE", "/repos/.*"],
+      ["YOUR_METHOD", "your-pattern-here"]
+    ]
+```
+
+## Custom Init Scripts
+
+Run project-specific setup when pods start. Edit `manifests/sandbox/configmap.yaml`:
+
+```yaml
+data:
+  init-workspace: |
+    #!/bin/bash
+    cd /home/dev/workspace
+    pip install -r requirements.txt
+    npm install
+```
+
+The script runs after the workspace is cloned but before the agent starts.
+
+## Resource Limits
+
+### Per-Pod Resources
+
+Set in your `~/.yolo-cage/config.env`:
+
+```bash
+POD_MEMORY_LIMIT=8Gi
+POD_MEMORY_REQUEST=2Gi
+POD_CPU_LIMIT=4
+POD_CPU_REQUEST=1
+```
+
+Run `yolo-cage-configure` inside the VM to apply.
+
+### Dispatcher and Proxy Resources
+
+Edit the respective deployment files in `manifests/dispatcher/deployment.yaml` and `manifests/proxy/egress-proxy.yaml`:
+
+```yaml
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "1Gi"
+    cpu: "1"
+```
+
+## VM Resources
+
+Edit the `Vagrantfile` before building:
+
+```ruby
+config.vm.provider "libvirt" do |lv|
+  lv.memory = 16384  # 16GB
+  lv.cpus = 8
+end
+```
+
+Then rebuild:
+
+```bash
+yolo-cage rebuild
+```
+
+## Multiple Repositories
+
+To work with multiple repositories, create separate config files and rebuild:
 
 ```bash
 # Project A
-git clone https://github.com/borenstein/yolo-cage.git yolo-cage-project-a
-cd yolo-cage-project-a
-# Edit manifests/namespace.yaml to use namespace: project-a
-# Edit other manifests to use project-a namespace
-# Configure for project A's repo, deploy
+cp ~/.yolo-cage/config.env ~/.yolo-cage/project-a.env
+# Edit project-a.env with REPO_URL for project A
 
-# Project B
-git clone https://github.com/borenstein/yolo-cage.git yolo-cage-project-b
-cd yolo-cage-project-b
-# Edit manifests/namespace.yaml to use namespace: project-b
-# Configure for project B's repo, deploy
+yolo-cage destroy
+yolo-cage build --config-file ~/.yolo-cage/project-a.env --up
 ```
 
-Each namespace is isolated with its own:
-- Agent pods
-- Egress proxy
-- LLM-Guard instance
-- Workspace PVC
-- Git dispatcher
-
-See [Using a Different Namespace](configuration.md#using-a-different-namespace) for the namespace change procedure.
+Each yolo-cage instance works with one repository at a time.
 
 ## Restricting GitHub CLI Access
 
-In YOLO mode, agents have full access to the GitHub CLI (`gh`). Use fine-grained tokens to limit what agents can do.
+The dispatcher blocks dangerous `gh` commands (merge, delete, api, etc.), but you can add defense-in-depth by using fine-grained PATs:
 
-### Creating an Issues-Only Token
+1. Go to [GitHub Settings > Developer settings > Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+2. Create a token with only the permissions you need
+3. Use this token in your `config.env`
 
-1. Go to [GitHub Settings > Developer settings > Personal access tokens > Fine-grained tokens](https://github.com/settings/tokens?type=beta)
-
-2. Click **Generate new token**
-
-3. Configure:
-   - **Repository access**: Select specific repositories
-   - **Permissions**: Set only "Issues: Read and write"
-
-4. Create the secret:
-```bash
-kubectl create secret generic yolo-cage-github-token \
-  --namespace=<namespace> \
-  --from-literal=token=github_pat_xxxxx
-```
-
-With an issues-only token, commands like `gh pr merge` or `gh repo delete` will fail at GitHub's API level.
+With an issues-only token, commands like `gh pr merge` would fail at GitHub's API level even if they bypassed the dispatcher.
 
 ## Observability
 
-### Persistent Logging
+### Viewing Logs
 
-To ship logs to an external system, add a sidecar container to `manifests/proxy/egress-proxy.yaml`:
+```bash
+vagrant ssh
 
-```yaml
-spec:
-  template:
-    spec:
-      containers:
-        - name: egress-proxy
-          # ... existing container ...
-        - name: log-shipper
-          image: fluent/fluent-bit:latest
-          volumeMounts:
-            - name: proxy-logs
-              mountPath: /var/log/proxy
+# Dispatcher logs
+kubectl logs -n yolo-cage deployment/git-dispatcher -f
+
+# Proxy logs
+kubectl logs -n yolo-cage deployment/egress-proxy -f
+
+# Pod logs
+kubectl logs -n yolo-cage yolo-cage-<branch> -f
 ```
 
-### Prometheus Metrics
+### Proxy Traffic Log
 
-LLM-Guard exposes Prometheus metrics. If using Prometheus Operator, create a ServiceMonitor:
+The egress proxy logs all requests to `/var/log/proxy/requests.jsonl` inside its container:
 
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: llm-guard
-  namespace: yolo-cage
-spec:
-  selector:
-    matchLabels:
-      app: llm-guard
-  endpoints:
-    - port: http
-      path: /metrics
+```bash
+kubectl exec -n yolo-cage deployment/egress-proxy -- tail -f /var/log/proxy/requests.jsonl
 ```
 
-## Disabling Components
+## Disabling Components (Not Recommended)
 
-### Run without secret scanning (not recommended)
+### Run Without Secret Scanning
 
-To disable secret scanning, remove the proxy environment variables from `manifests/sandbox/pod-template.yaml` and update `manifests/sandbox/networkpolicy.yaml` to allow direct internet access. This removes exfiltration protection.
+To disable the proxy entirely, remove the proxy environment variables from `manifests/sandbox/pod-template.yaml`:
 
-### Run without LLM-Guard
+```yaml
+# Remove these lines:
+- name: HTTP_PROXY
+  value: "http://egress-proxy:8080"
+- name: HTTPS_PROXY
+  value: "http://egress-proxy:8080"
+```
 
-To rely only on the domain blocklist without LLM-Guard, modify `dockerfiles/proxy/addon.py` to skip the LLM-Guard call. Less thorough but removes the external dependency.
+This removes exfiltration protection entirely.
+
+### Run Without Pre-Push Hooks
+
+Edit `manifests/dispatcher/configmap.yaml`:
+
+```yaml
+data:
+  PRE_PUSH_HOOKS: '[]'
+```
+
+This allows pushing commits containing secrets.
