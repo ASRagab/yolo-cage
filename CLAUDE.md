@@ -13,7 +13,7 @@ Sandboxed Claude Code agents. See [README.md](README.md) for full documentation.
 
 ```bash
 # Full rebuild from repo root
-./scripts/yolo-cage rebuild
+./scripts/yolo-cage build
 
 # Or manual testing inside VM
 vagrant destroy -f && vagrant up
