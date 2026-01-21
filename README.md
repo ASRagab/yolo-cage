@@ -6,7 +6,9 @@ That's why you'd **never** just shut off the safeguards for a tool like Claude C
 
 So you wait. And you answer. Decision fatigue sets in. And that's when it happens.
 
-[FIRST VIDEO]
+<p align="center">
+  <img src="assets/disaster.gif" width="600" alt="Agent deletes entire repo">
+</p>
 
 Permission prompts neglect the weakest part of the thread model: a tired user. What if we could empower the agent while limiting its blast radius, thus deferring your decisions until PR review?
 
