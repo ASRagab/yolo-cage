@@ -443,6 +443,49 @@ def cmd_destroy(args: argparse.Namespace) -> None:
     log_success("VM destroyed")
 
 
+def cmd_configure(args: argparse.Namespace) -> None:
+    """Update configuration and sync to VM."""
+    if args.interactive:
+        prompt_config()
+    else:
+        config_path = YOLO_CAGE_HOME / "config.env"
+        if not config_path.exists():
+            die(f"No config found at {config_path}\nRun 'yolo-cage configure --interactive' to create one.")
+
+        # Validate the config before syncing
+        config = load_config()
+        pat = config.get("GITHUB_PAT")
+        repo_url = config.get("REPO_URL")
+
+        if not pat or not repo_url:
+            die("Missing GITHUB_PAT or REPO_URL in config.")
+
+        log_step("Validating repository access...")
+        valid, message = validate_github_repo(repo_url, pat)
+        if not valid:
+            die(message)
+        log_success(message)
+
+    # Sync to VM if it's running
+    repo_dir = detect_repo_dir()
+    if repo_dir:
+        result = subprocess.run(
+            ["vagrant", "status", "--machine-readable"],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        vm_running = any(",state,running" in line for line in result.stdout.splitlines())
+
+        if vm_running:
+            sync_config_to_vm()
+        else:
+            log_success(f"Config saved to {YOLO_CAGE_HOME / 'config.env'}")
+            print("VM is not running. Config will be applied on next 'yolo-cage up'.")
+    else:
+        log_success(f"Config saved to {YOLO_CAGE_HOME / 'config.env'}")
+
+
 def cmd_create(args: argparse.Namespace) -> None:
     """Create a sandbox pod for a branch."""
     ensure_vm_running()
@@ -741,6 +784,19 @@ def main() -> None:
         description="Destroy the VM and all data inside it. Your config.env will be preserved.",
     )
     p_destroy.set_defaults(func=cmd_destroy)
+
+    # configure
+    p_configure = subparsers.add_parser(
+        "configure",
+        help="Update configuration and sync to VM",
+        description="Validate and sync configuration to the VM. Use --interactive to re-enter credentials.",
+    )
+    p_configure.add_argument(
+        "--interactive", "-i",
+        action="store_true",
+        help="Prompt for configuration interactively",
+    )
+    p_configure.set_defaults(func=cmd_configure)
 
     # status
     p_status = subparsers.add_parser(
